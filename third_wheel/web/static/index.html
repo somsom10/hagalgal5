@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>הגלגל 5 · Third Wheel</title>
+  <meta name="description" content="מוצא זוגות לבד באולם הקולנוע — וקונה לך את המושב שממש לידם. כלי בדיחה. שעובד באמת." />
+  <link rel="icon" type="image/svg+xml" href="/static/wheel.svg" />
+  <link rel="apple-touch-icon" href="/assets/third_wheel_logo.png" />
+
+  <!-- Open Graph / social share. __BASE_URL__ is filled in per-request so the
+       image URL is absolute (social scrapers reject relative URLs). -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="הגלגל 5" />
+  <meta property="og:title" content="הגלגל 5 · Third Wheel" />
+  <meta property="og:description" content="מוצא זוגות לבד באולם הקולנוע — וקונה לך את המושב שממש לידם. כלי בדיחה. שעובד באמת." />
+  <meta property="og:url" content="__BASE_URL__/" />
+  <meta property="og:image" content="__BASE_URL__/assets/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="הגלגל 5 — יד מפלצתית נשלחת אל דלי הפופקורן של זוג באולם קולנוע" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="הגלגל 5 · Third Wheel" />
+  <meta name="twitter:description" content="מוצא זוגות לבד באולם — וקונה לך את המושב שממש לידם." />
+  <meta name="twitter:image" content="__BASE_URL__/assets/og-image.png" />
+
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="hero">
+    <div class="hero__banner">
+      <img src="/assets/banner.png" alt="זוג יושב יד ביד באולם קולנוע ריק, וגלגל שלישי בודד יושב ממש לידם עם דלי פופקורן" />
+    </div>
+    <img class="hero__logo" src="/assets/third_wheel_logo.png" alt="הגלגל 5" />
+    <p class="hero__tagline">מוצא זוגות שיושבים <span class="accent">לבד</span> באולם — וקונה לך את המושב שממש לידם.</p>
+    <p class="hero__warning">כלי בדיחה. שעובד <span class="accent">באמת</span>. 🍿</p>
+  </header>
+
+  <main>
+    <!-- Scan controls -->
+    <section class="panel" id="scan">
+      <h2>מצא את הקורבן</h2>
+      <div class="controls">
+        <label class="ctl">
+          <span>תאריך</span>
+          <input type="date" id="date" />
+        </label>
+
+        <button id="scanBtn" class="btn btn--primary">מצא זוג בודד 🍿</button>
+      </div>
+      <p class="hint" id="scanHint"></p>
+    </section>
+
+    <!-- Results -->
+    <section class="panel" id="resultsPanel" hidden>
+      <h2 id="resultsTitle">האולמות הבודדים ביותר</h2>
+      <div id="results" class="results"></div>
+    </section>
+
+    <!-- Fun fact -->
+    <section class="panel funfact" id="funfact">
+      <div class="funfact__body">
+        <div class="funfact__content">
+          <h2>עובדה מעשירה לדייט של השכנים</h2>
+          <p class="funfact__lead">בזמן שתשבו לידם, אולי שווה לזרוק עובדה קטנה. פשוט ככה, בקול רם.</p>
+          <p id="factSource" class="funfact__source"></p>
+          <blockquote id="factText" class="funfact__text"><span class="spinner"></span>טוען עובדה…</blockquote>
+          <button id="factBtn" class="btn">עובדה נוספת 🎬</button>
+        </div>
+        <img class="funfact__hand" src="/assets/third_hand_in_popcorn.png" alt="יד שלישית נכנסת לדלי הפופקורן" />
+      </div>
+    </section>
+  </main>
+
+  <!-- Seat-map modal -->
+  <div class="modal" id="modal" hidden>
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__box" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button class="modal__close" data-close aria-label="סגור">✕</button>
+      <h3 id="modalTitle">מפת מושבים</h3>
+      <div id="seatmap" class="seatmap"></div>
+      <div id="pick" class="pick"></div>
+      <p class="sim-note">התפוסה כאן <strong>מדומה</strong> — נתוני המושב המדויקים חסומים מאחורי התחברות, אז אנחנו מציבים את מספר הצופים האמיתי על גבי מפת האולם האמיתית.</p>
+      <a id="bookLink" class="btn btn--primary" href="#" target="_blank" rel="noopener">לאתר פלאנט 💺</a>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <p class="footer__joke">
+      זה גאג. אל תהיו מפחידים. אל תשבו באמת ליד זרים שירגישו לא בנוח —
+      הסכמה היא לא שדה במפת המושבים.
+    </p>
+    <p class="footer__tech">
+      נתונים ציבוריים בלבד מ־Planet. שום דבר כאן לא עוקף התחברות או הגנות, לא נאסף
+      מידע אישי על צופים אחרים (רק ספירת מושבים אנונימית), והבקשות מוגבלות וממוזנות
+      כדי לא להעמיס על השרתים.
+    </p>
+    <p class="footer__disclaimer">
+      אתר פארודיה. לא רשמי ואינו מזוהה עם Planet או עם IMDb. הנתונים נשלפים מהאתרים
+      הציבוריים שלהם ויוסרו מיד לפי בקשה — לפניות והסרה:
+      <a href="mailto:dev@amosr.com">dev@amosr.com</a>.
+    </p>
+    <p class="footer__credits">אייקונים מאת Lorc · <a href="https://game-icons.net" target="_blank" rel="noopener">game-icons.net</a> (CC BY 3.0)</p>
+    <p class="footer__sig">הגלגל 5 · Third Wheel</p>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

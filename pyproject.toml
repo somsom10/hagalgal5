@@ -1,0 +1,24 @@
+[project]
+name = "third-wheel"
+version = "0.1.0"
+description = "Find cinema rooms with a lonely single/couple and grab the seat right next to them. A joke tool that actually works."
+requires-python = ">=3.10"
+dependencies = ["httpx>=0.27"]
+
+[project.scripts]
+third-wheel = "third_wheel.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+web = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["third_wheel", "third_wheel.providers", "third_wheel.web"]
+
+[tool.setuptools.package-data]
+"third_wheel.web" = ["static/*", "data/*"]
+"third_wheel" = ["assets/*"]
