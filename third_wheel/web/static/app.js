@@ -242,8 +242,13 @@ async function loadFact() {
 }
 
 // -------------------------------------------------------------------- init
-dateInput.value = new Date().toISOString().slice(0, 10);
-dateInput.min = new Date().toISOString().slice(0, 10);
+// Always the *Israel* date (the cinemas' timezone), regardless of where the
+// visitor is or their device clock — en-CA formats as YYYY-MM-DD.
+function israelToday() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
+}
+dateInput.value = israelToday();
+dateInput.min = israelToday();
 scanBtn.addEventListener("click", runScan);
 factBtn.addEventListener("click", loadFact);
 loadFact(); // show a fact right away, not a "click the button" prompt

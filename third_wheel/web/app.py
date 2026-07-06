@@ -8,6 +8,7 @@ All the anti-abuse machinery lives in :mod:`third_wheel.web.service`.
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import threading
 from pathlib import Path
 
@@ -118,7 +119,20 @@ def index(request: Request):
     host = request.headers.get("x-forwarded-host") or request.headers.get("host") \
         or (request.client.host if request.client else "localhost")
     base = f"{proto}://{host}"
-    return HTMLResponse(html.replace("__BASE_URL__", base))
+    html = html.replace("__BASE_URL__", base).replace("__ASSET_V__", _asset_version())
+    return HTMLResponse(html)
+
+
+def _asset_version() -> str:
+    """Content hash of the CSS/JS, appended to their URLs (?v=) so a changed
+    file busts the CDN cache immediately -- the HTML itself is never cached."""
+    h = hashlib.sha1()
+    for name in ("style.css", "app.js"):
+        try:
+            h.update((_STATIC / name).read_bytes())
+        except OSError:
+            pass
+    return h.hexdigest()[:10]
 
 
 app.mount("/assets", StaticFiles(directory=_ASSETS), name="assets")
