@@ -23,7 +23,11 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from zoneinfo import ZoneInfo
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:  # Python 3.8: stdlib zoneinfo arrived in 3.9
+    from backports.zoneinfo import ZoneInfo
 
 import httpx
 
