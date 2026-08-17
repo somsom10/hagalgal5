@@ -178,6 +178,8 @@ rooms for exact adjacency assertions. No network needed.
 - Seat-map marker (grasping claw) and the branding wheel/spinner icons are by
   **Lorc**, from [game-icons.net](https://game-icons.net), licensed **CC BY 3.0**.
   The site footer carries the required attribution.
-- `assets/og-image.png` is the 1200×630 social-share card (Open Graph /
+- `assets/og-image.jpg` is the 1200×630 social-share card (Open Graph /
   Twitter). The `/` route rewrites the card's URL to an absolute one per request
-  so link previews resolve on whatever host it's served from.
+  so link previews resolve on whatever host it's served from. Displayed images
+  are WebP at display-appropriate sizes; the original PNG masters stay in the
+  repo (and in git history) so old cached URLs keep resolving.

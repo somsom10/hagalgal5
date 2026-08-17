@@ -29,7 +29,7 @@ body {
     radial-gradient(1200px 600px at 50% -10%, rgba(120, 15, 22, 0.30), transparent 60%),
     radial-gradient(900px 500px at 80% 20%, rgba(60, 8, 12, 0.22), transparent 55%),
     linear-gradient(180deg, rgba(8, 6, 10, 0.88), rgba(8, 6, 10, 0.94)),
-    url(/assets/front_cinema.png) center top / cover fixed,
+    url(/assets/front_cinema.webp) center top / cover fixed,
     var(--bg);
   min-height: 100vh;
   line-height: 1.6;
@@ -411,7 +411,7 @@ body.modal-open { overflow: hidden; } /* no page scroll behind the dialog */
   /* an "exit the theatre" band: the dim angled house, darkened for legibility */
   background:
     linear-gradient(180deg, rgba(8, 6, 10, 0.82), rgba(8, 6, 10, 0.88)),
-    url(/assets/side_cinema.png) center / cover;
+    url(/assets/side_cinema.webp) center / cover;
   border: 1px solid rgba(120, 20, 26, 0.28);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
