@@ -25,24 +25,60 @@ const resultsEl = $("#results");
 const resultsTitle = $("#resultsTitle");
 
 let staleTimer = null;
-const currentTarget = "couple"; // the site targets couples only
 
 function setHint(msg, isError) {
   scanHint.innerHTML = msg;
   scanHint.classList.toggle("error", !!isError);
 }
 
+// While a cold scan crawls every cinema, the wait itself becomes part of the
+// bit: rotating "status reports" from the hunt. Cached responses come back
+// before the first joke fires, so warm scans never flash them.
+const SCAN_JOKES = [
+  "בודק מי קנה פופקורן זוגי…",
+  "סורק את השורה האחורית. ברור שהם בשורה האחורית…",
+  "מאתר זוגות שבטוחים שהם לבד…",
+  "סופר כיסאות ריקים. כל כך הרבה כיסאות ריקים…",
+  "מוודא שנשאר מקום לגלגל שלישי…",
+  "מקשיב לרשרוש של שקית חטיפים באולם 6…",
+  "מצליב מפות אולמות עם רמת מבוכה צפויה…",
+  "מחשב מדד בדידות ארצי…",
+];
+let jokeDelay = null;
+let jokeTimer = null;
+let lastJoke = -1;
+
+function showScanJoke() {
+  let i;
+  do { i = Math.floor(Math.random() * SCAN_JOKES.length); } while (i === lastJoke);
+  lastJoke = i;
+  setHint(`<span class="spinner"></span>${SCAN_JOKES[i]}`);
+}
+
+function startScanJokes() {
+  stopScanJokes();
+  jokeDelay = setTimeout(() => {
+    showScanJoke();
+    jokeTimer = setInterval(showScanJoke, 2400);
+  }, 900);
+}
+
+function stopScanJokes() {
+  if (jokeDelay) { clearTimeout(jokeDelay); jokeDelay = null; }
+  if (jokeTimer) { clearInterval(jokeTimer); jokeTimer = null; }
+}
+
 async function runScan() {
   const date = dateInput.value;
-  const target = currentTarget;
   if (!date) { setHint("בחרו תאריך.", true); return; }
 
   scanBtn.disabled = true;
-  setHint('<span class="spinner"></span>סורק את כל האולמות אחרי נשמה בודדה…');
+  setHint('<span class="spinner"></span>סורק את כל האולמות אחרי זוג בודד…');
+  startScanJokes();
   if (staleTimer) { clearTimeout(staleTimer); staleTimer = null; }
 
   try {
-    const url = `/api/scan?date=${encodeURIComponent(date)}&target=${target}`;
+    const url = `/api/scan?date=${encodeURIComponent(date)}`;
     const res = await fetch(url);
     if (res.status === 429) { setHint("רגע, יותר מדי בקשות. נסו שוב בעוד כמה שניות.", true); return; }
     const data = await res.json();
@@ -69,11 +105,12 @@ async function runScan() {
       setHint("מציג תוצאות אחרונות ומרענן ברקע… 🔄");
       staleTimer = setTimeout(runScan, 4500);
     } else {
-      setHint(data.count ? "" : "");
+      setHint("");
     }
   } catch (e) {
     setHint("משהו השתבש בדרך לאולם. נסו שוב.", true);
   } finally {
+    stopScanJokes();
     scanBtn.disabled = false;
   }
 }
@@ -81,7 +118,6 @@ async function runScan() {
 function renderResults(data) {
   resultsPanel.hidden = false;
   resultsEl.innerHTML = "";
-  const targetLabel = { both: "זוגות ובודדים", couple: "זוגות", single: "בודדים" }[data.target] || "";
   resultsTitle.textContent = `האולמות הבודדים ביותר · ${data.date}`;
 
   if (!data.opportunities.length) {
@@ -104,9 +140,8 @@ function card(o, rank) {
   c.appendChild(el("div", "card__stat",
     `<b>${soldWord}</b> מתוך ${o.capacity} מושבים — יישארו לך <b>${o.seats_free_beside_you}</b> מושבים ריקים סביבם`));
 
-  if (o.beside) {
-    const who = o.beside === "couple" ? "זוג 💑" : "בודד/ת 🧍";
-    c.appendChild(el("div", "card__beside", `תשב ממש ליד <b>${who}</b>`));
+  if (o.beside === "couple") {
+    c.appendChild(el("div", "card__beside", "תשב ממש ליד <b>זוג 💑</b>"));
   }
 
   const pct = Math.round(o.emptiness * 100);
@@ -147,12 +182,36 @@ const pickEl = $("#pick");
 const bookLink = $("#bookLink");
 const modalTitle = $("#modalTitle");
 
-function closeModal() { modal.hidden = true; }
+// While the dialog is open: focus lives inside it (and returns to the button
+// that opened it on close), Tab cycles within it, and the page behind it
+// doesn't scroll. Pure dialog mechanics — nothing to do with the seat data.
+let lastFocused = null;
+
+function closeModal() {
+  if (modal.hidden) return;
+  modal.hidden = true;
+  document.body.classList.remove("modal-open");
+  if (lastFocused && document.contains(lastFocused)) lastFocused.focus();
+  lastFocused = null;
+}
 modal.querySelectorAll("[data-close]").forEach((n) => n.addEventListener("click", closeModal));
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+modal.addEventListener("keydown", (e) => {
+  if (e.key !== "Tab") return;
+  const items = [...modal.querySelectorAll("button, a[href]")]
+    .filter((n) => !n.hidden && n.offsetParent !== null);
+  if (!items.length) return;
+  const first = items[0];
+  const last = items[items.length - 1];
+  if (e.shiftKey && document.activeElement === first) { last.focus(); e.preventDefault(); }
+  else if (!e.shiftKey && document.activeElement === last) { first.focus(); e.preventDefault(); }
+});
 
 async function openSeatmap(o) {
   modal.hidden = false;
+  document.body.classList.add("modal-open");
+  lastFocused = document.activeElement;
+  modal.querySelector(".modal__close").focus();
   modalTitle.textContent = `${o.film} · ${o.cinema}`;
   seatmapEl.innerHTML = '<p class="empty-state"><span class="spinner"></span>טוען את מפת האולם…</p>';
   pickEl.innerHTML = "";
@@ -160,7 +219,7 @@ async function openSeatmap(o) {
   else { bookLink.hidden = true; }
 
   try {
-    const res = await fetch(`/api/seatmap?presentation=${encodeURIComponent(o.presentation_id)}&sold=${o.seats_sold}&target=${currentTarget}`);
+    const res = await fetch(`/api/seatmap?presentation=${encodeURIComponent(o.presentation_id)}&sold=${o.seats_sold}`);
     if (!res.ok) throw new Error("http " + res.status);
     const data = await res.json();
     renderSeatmap(data);
@@ -206,7 +265,7 @@ function renderSeatmap(data) {
       `🪑 המטרה: <strong>${escapeHtml(data.pick.target)}</strong><br/>` +
       `👉 שב במושב <span class="seatlabel">${escapeHtml(data.pick.seat)}</span> — ממש לידם.`;
   } else {
-    pickEl.innerHTML = "לא נמצא בודד/זוג מבודד עם מושב פנוי ממש לידו. האולם ריק מדי או חברותי מדי. 🤷";
+    pickEl.innerHTML = "לא נמצא זוג מבודד עם מושב פנוי ממש לידו. האולם ריק מדי או חברותי מדי. 🤷";
   }
 }
 

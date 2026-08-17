@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import datetime as dt
 import hashlib
+import logging
 import threading
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from fastapi import FastAPI, Query, Request
@@ -30,6 +32,62 @@ app = FastAPI(title="הגלגל 5 · Third Wheel", docs_url=None, redoc_url=None
 
 scanner = Scanner(cache_dir=_CACHE_DIR)
 limiter = RateLimiter(capacity=30, refill_per_sec=0.5)
+
+# ---------------------------------------------------------------- access log
+# One combined-log-format line per request, so `goaccess .logs/access.log
+# --log-format=COMBINED` answers "did anyone visit, and from where" without a
+# tracker. IPs are truncated (IPv4 last octet / IPv6 tail zeroed) before they
+# ever touch disk, keeping the footer's no-personal-data promise honest.
+_LOG_DIR = _HERE.parent.parent / ".logs"
+
+# %b month names are locale-dependent; goaccess needs the English ones.
+_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+def _setup_access_log() -> logging.Logger:
+    logger = logging.getLogger("third_wheel.access")
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    if not logger.handlers:
+        _LOG_DIR.mkdir(parents=True, exist_ok=True)
+        handler = RotatingFileHandler(
+            _LOG_DIR / "access.log",
+            maxBytes=20_000_000, backupCount=3, encoding="utf-8",
+        )
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        logger.addHandler(handler)
+    return logger
+
+
+_access_log = _setup_access_log()
+
+
+def _anonymize_ip(addr: str) -> str:
+    if ":" in addr:  # IPv6: keep the routing prefix, zero the rest
+        return ":".join(addr.split(":")[:3]) + "::"
+    parts = addr.split(".")
+    if len(parts) == 4:  # IPv4: drop the last octet
+        return ".".join(parts[:3]) + ".0"
+    return addr
+
+
+@app.middleware("http")
+async def _log_request(request: Request, call_next):
+    response = await call_next(request)
+    now = dt.datetime.now(dt.timezone.utc)
+    when = (f"{now.day:02d}/{_MONTHS[now.month - 1]}/{now.year}"
+            f":{now:%H:%M:%S} +0000")
+    path = request.url.path + (f"?{request.url.query}" if request.url.query else "")
+    referer = request.headers.get("referer", "-").replace('"', "") or "-"
+    agent = request.headers.get("user-agent", "-").replace('"', "") or "-"
+    size = response.headers.get("content-length", "-")
+    _access_log.info(
+        f'{_anonymize_ip(_client_key(request))} - - [{when}] '
+        f'"{request.method} {path} HTTP/1.1" {response.status_code} {size} '
+        f'"{referer}" "{agent}"'
+    )
+    return response
 
 
 def _today() -> str:
@@ -55,7 +113,6 @@ def _client_key(request: Request) -> str:
 def api_scan(
     request: Request,
     date: str = Query(default_factory=_today),
-    target: str = Query(default="both", pattern="^(single|couple|both)$"),
     top: int = Query(default=12, ge=1, le=30),
 ):
     if not _valid_date(date):
@@ -63,10 +120,9 @@ def api_scan(
     if not limiter.allow(_client_key(request), cost=2.0):
         return JSONResponse({"error": "rate_limited"}, status_code=429)
 
-    opps, stale = scanner.opportunities(date=date, target=target, top=top)
+    opps, stale = scanner.opportunities(date=date, top=top)
     return {
         "date": date,
-        "target": target,
         "stale": stale,
         "error": scanner.last_error(date),
         "count": len(opps),
@@ -78,8 +134,7 @@ def api_scan(
 def api_seatmap(
     request: Request,
     presentation: str = Query(..., min_length=1, max_length=32),
-    sold: int = Query(default=2, ge=1, le=500),
-    target: str = Query(default="both", pattern="^(single|couple|both)$"),
+    sold: int = Query(default=2, ge=2, le=500),
 ):
     if not presentation.isdigit():
         return JSONResponse({"error": "bad_presentation"}, status_code=400)
@@ -92,7 +147,7 @@ def api_seatmap(
             {"error": "seatplan_unavailable", "detail": f"{type(exc).__name__}"},
             status_code=502,
         )
-    return seatmap_json(plan, presentation_id=presentation, sold=sold, target=target)
+    return seatmap_json(plan, presentation_id=presentation, sold=sold)
 
 
 @app.get("/api/funfact")

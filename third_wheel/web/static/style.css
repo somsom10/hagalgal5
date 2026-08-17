@@ -278,6 +278,7 @@ input[type="date"] { color-scheme: dark; }
 }
 
 /* ---------------------------------------------------------------- modal */
+body.modal-open { overflow: hidden; } /* no page scroll behind the dialog */
 .modal { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 1rem; }
 .modal[hidden] { display: none; }
 .modal__backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.78); backdrop-filter: blur(3px); }

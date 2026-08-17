@@ -3,9 +3,8 @@
 This is the layer that keeps Third Wheel from hammering Planet's servers. The
 expensive work -- listing every cinema's screenings for a date and enriching the
 emptiest ones with seat-plan capacity -- is done **once per date** and shared by
-every visitor for a TTL window. Filtering (single / couple, how crowded still
-counts as "lonely") is then applied cheaply in memory, so changing a filter
-never triggers new network traffic.
+every visitor for a TTL window. The couple-isolation filter is then applied
+cheaply in memory, so re-requests never trigger new network traffic.
 
 Guarantees:
 * **Single-flight**: concurrent requests for the same cold date wait on one scan
@@ -44,13 +43,12 @@ PREFILTER = 50
 LONELY_MAX = 6
 
 
-def target_spec(target: str) -> tuple[set[int], int]:
-    """Map a UI target to (allowed group sizes, minimum occupants)."""
-    if target == "single":
-        return {1}, 1
-    if target == "couple":
-        return {2}, 2
-    return {1, 2}, 1
+# The site targets couples, full stop. It used to also offer "a lone single",
+# but pointing visitors at one person sitting alone crossed from parody into
+# actually creepy, so that option was removed from the web backend on purpose
+# (the generic engine/CLI still take arbitrary group sizes).
+TARGET_SIZES = {2}   # only isolated groups of exactly this size qualify
+TARGET_MIN_SOLD = 2  # fewer occupants than this can't contain a couple
 
 
 def sim_seed(presentation_id: str) -> int:
@@ -118,42 +116,33 @@ class Scanner:
 
     # -- public --------------------------------------------------------------
 
-    def opportunities(
-        self,
-        date: str,
-        target: str = "both",
-        top: int = 12,
-    ) -> tuple[list[Opportunity], bool]:
-        """Ranked opportunities for ``date`` matching ``target``.
+    def opportunities(self, date: str, top: int = 12) -> tuple[list[Opportunity], bool]:
+        """Ranked couple-adjacent opportunities for ``date``.
 
         A room qualifies only if its (simulated) occupancy actually contains an
-        **isolated group of the requested kind** with a free seat beside it --
-        so "singles" returns rooms where you'd sit next to a lone single (even
-        if a couple is also in the room), and "couples" returns rooms where
-        you'd sit next to a pair. The simulation is cheap (CPU only, seat plans
-        are already cached) so no extra upstream traffic.
+        **isolated couple** with a free seat beside it. The simulation is cheap
+        (CPU only, seat plans are already cached) so no extra upstream traffic.
 
         Returns ``(opportunities, stale)``.
         """
         entry, stale = self._get_candidates(date)
-        sizes, min_sold = target_spec(target)
         opps: list[Opportunity] = []
         for s in entry.candidates:
             sold = s.seats_sold
             if sold is None or s.capacity is None:
                 continue
-            if sold < min_sold or sold > LONELY_MAX:
+            if sold < TARGET_MIN_SOLD or sold > LONELY_MAX:
                 continue
             try:
                 plan = self._provider.seat_plan(s)  # cached; no network
             except Exception:
                 continue
             occupied = simulate_occupancy(
-                plan, sold, seed=sim_seed(s.presentation_id), mode=target
+                plan, sold, seed=sim_seed(s.presentation_id), mode="couple"
             )
-            pick = find_third_wheel(plan, occupied, sizes=sizes)
+            pick = find_third_wheel(plan, occupied, sizes=TARGET_SIZES)
             if pick is None:
-                continue  # no isolated target-group with a seat beside it
+                continue  # no isolated couple with a seat beside it
             opps.append(
                 Opportunity(
                     showtime=s,
@@ -290,26 +279,25 @@ def opportunity_json(o: Opportunity) -> dict:
         "seats_free_beside_you": seats_free,
         "emptiness": round(o.emptiness, 3),
         "loneliness": o.loneliness,
-        "beside": {1: "single", 2: "couple"}.get(o.beside_size),
+        "beside": "couple" if o.beside_size == 2 else None,
         "booking_link": PLANET_HOME,
     }
 
 
-def seatmap_json(plan: SeatPlan, presentation_id: str, sold: int, target: str) -> dict:
+def seatmap_json(plan: SeatPlan, presentation_id: str, sold: int) -> dict:
     """A room grid plus the third-wheel pick, on clearly-simulated occupancy.
 
     Live per-seat occupancy is gated behind an authenticated booking session
     (see occupancy.py), so the exact seats are simulated from the real head
     count on the real geometry, and labelled as such to the visitor. The same
-    seed + target used in the scan are reused here so the map matches the
-    suggestion the visitor clicked.
+    seed used in the scan is reused here so the map matches the suggestion the
+    visitor clicked.
     """
-    sizes, _ = target_spec(target)
     sold = max(1, sold)
     occupied = simulate_occupancy(
-        plan, sold, seed=sim_seed(presentation_id), mode=target
+        plan, sold, seed=sim_seed(presentation_id), mode="couple"
     )
-    pick = find_third_wheel(plan, occupied, sizes=sizes)
+    pick = find_third_wheel(plan, occupied, sizes=TARGET_SIZES)
     highlight = pick.seat if pick else None
 
     rows = {}
@@ -355,8 +343,6 @@ def _describe_he(cluster) -> str:
     ``Cluster.describe`` is English)."""
     labels = ", ".join(s.label for s in cluster.seats)
     row = cluster.row_name
-    if cluster.size == 1:
-        return f"בודד/ה בשורה {row} (מושב {labels})"
     if cluster.size == 2:
         return f"זוג בשורה {row} (מושבים {labels})"
     return f"{cluster.size} יחד בשורה {row} (מושבים {labels})"

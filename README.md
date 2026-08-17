@@ -38,10 +38,13 @@ So:
 
 The whole thing also runs as a Hebrew, right-to-left, horror-parody **website**
 (the on-screen name is **הגלגל 5**). It wraps the same engine in a small FastAPI
-app: pick a date and a target (a lone single, a couple, or both), get the day's
-loneliest rooms ranked, open any room's live seat map with the awkward
-third-wheel seat glowing, and pull a random movie "fun fact" to enrich the
-neighbouring couple's date.
+app: pick a date, get the day's loneliest couple-screenings ranked, open any
+room's live seat map with the awkward third-wheel seat glowing, and pull a
+random movie "fun fact" to enrich the neighbouring couple's date.
+
+The site targets **couples only**. The engine and CLI can also hunt lone
+singles, but pointing a public website at one person sitting alone is not
+parody, it's menacing — so the web backend deliberately has no "single" target.
 
 ```bash
 .venv/bin/pip install -r requirements.txt
@@ -62,6 +65,11 @@ real traffic:
   load is capped at one enrichment pass per date per window regardless of
   traffic. Seat plans are additionally cached to disk (`.cache/`).
 - A lenient per-IP token bucket stops a single client spinning the endpoints.
+
+The site writes an **anonymized access log** (combined log format, IPv4 last
+octet / IPv6 tail zeroed before hitting disk) to `.logs/access.log`, so
+`goaccess .logs/access.log --log-format=COMBINED` shows traffic and referrers
+without any tracker or personal data.
 
 **Fun facts** live in
 [`third_wheel/web/data/fun_facts.json`](third_wheel/web/data/fun_facts.json) —
