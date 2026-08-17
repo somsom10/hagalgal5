@@ -58,7 +58,7 @@ function startScanJokes() {
   stopScanJokes();
   jokeDelay = setTimeout(() => {
     showScanJoke();
-    jokeTimer = setInterval(showScanJoke, 2400);
+    jokeTimer = setInterval(showScanJoke, 3000);
   }, 900);
 }
 
