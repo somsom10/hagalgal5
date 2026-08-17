@@ -148,7 +148,11 @@ def api_scan(
     if not _valid_date(date):
         return JSONResponse({"error": "bad_date"}, status_code=400)
     if date < _scan_date():  # today or earlier: spontaneity is for couples
-        return JSONResponse({"error": "date_too_soon"}, status_code=400)
+        # `earliest` lets a stale tab (or a client with a skewed clock) snap
+        # its date picker to the server's idea of the first valid date.
+        return JSONResponse(
+            {"error": "date_too_soon", "earliest": _scan_date()}, status_code=400
+        )
     if not limiter.allow(_client_key(request), cost=2.0):
         return JSONResponse({"error": "rate_limited"}, status_code=429)
 

@@ -88,7 +88,7 @@ async function runScan(manual) {
   if (manual) pendingJudgment = judgeRepeatScans();
 
   scanBtn.disabled = true;
-  setHint('<span class="spinner"></span>סורק את כל האולמות אחר זוג בודד…');
+  setHint('<span class="spinner"></span>סורק את כל האולמות אחרי נשמות בודדות…');
   startScanJokes();
   if (staleTimer) { clearTimeout(staleTimer); staleTimer = null; }
 
@@ -103,6 +103,14 @@ async function runScan(manual) {
       return;
     }
     if (data.error === "date_too_soon") {
+      // Trust the server's clock over ours: snap to its earliest valid date
+      // and retry once. (Second round can't loop: value === earliest then.)
+      if (data.earliest && dateInput.value !== data.earliest) {
+        dateInput.min = data.earliest;
+        dateInput.value = data.earliest;
+        runScan(false);
+        return;
+      }
       setHint("להיום כבר אי אפשר — ספונטניות זה לזוגות. נסו מחר.", true);
       return;
     }
