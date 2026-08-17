@@ -32,7 +32,9 @@
 
   <header class="hero">
     <div class="hero__banner">
-      <img src="/assets/banner.png" alt="זוג יושב יד ביד באולם קולנוע ריק, וגלגל שלישי בודד יושב ממש לידם עם דלי פופקורן" />
+      <!-- ?v=2: shadow-lifted rev of the banner; the query busts the week-long
+           image cache (browser + Cloudflare edge) since assets aren't hashed. -->
+      <img src="/assets/banner.png?v=2" alt="זוג יושב יד ביד באולם קולנוע ריק, וגלגל שלישי בודד יושב ממש לידם עם דלי פופקורן" />
     </div>
     <img class="hero__logo" src="/assets/third_wheel_logo.png" alt="הגלגל 5" />
     <p class="hero__tagline">מוצא זוגות שיושבים <span class="accent">לבד</span> באולם — וקונה לך את המושב שממש לידם.</p>
