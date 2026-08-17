@@ -15,6 +15,10 @@
 
 * { box-sizing: border-box; }
 
+/* Author display rules (e.g. .btn) silently defeat the hidden attribute's
+   UA styling; make hidden actually mean hidden. */
+[hidden] { display: none !important; }
+
 html { scroll-behavior: smooth; }
 
 body {
@@ -306,7 +310,7 @@ body.modal-open { overflow: hidden; } /* no page scroll behind the dialog */
   cursor: pointer;
 }
 .modal__close:hover { color: var(--blood-bright); }
-.modal h3 { margin: 0 0 1rem; color: #fff; }
+.modal h3 { margin: 0 0 1rem; padding-inline-start: 2.6rem; color: #fff; } /* clear the ✕ */
 
 /* --------------------------------------------------------------- seatmap */
 .seatmap { overflow-x: auto; padding-bottom: 0.5rem; text-align: center; }
