@@ -23,6 +23,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -53,8 +54,8 @@ TARGET_MIN_SOLD = 2  # fewer occupants than this can't contain a couple
 
 def sim_seed(presentation_id: str) -> int:
     """Deterministic per-screening seed so a room simulates identically in the
-    scan and in its seat map (and refreshes once a day)."""
-    today = _dt.date.today().isoformat()
+    scan and in its seat map (and refreshes once a day, on Israel's clock)."""
+    today = _dt.datetime.now(ZoneInfo("Asia/Jerusalem")).date().isoformat()
     return abs(hash((presentation_id, today))) % (2**31)
 
 

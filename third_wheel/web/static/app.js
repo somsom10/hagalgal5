@@ -38,11 +38,10 @@ const SCAN_JOKES = [
   "בודק מי קנה פופקורן זוגי…",
   "סורק את השורה האחורית. ברור שהם בשורה האחורית…",
   "מאתר זוגות שבטוחים שהם לבד…",
-  "סופר כיסאות ריקים. כל כך הרבה כיסאות ריקים…",
-  "מוודא שנשאר מקום לגלגל שלישי…",
+  "סופר כיסאות ריקים…",
+  "מוודא שנשאר מקום לגלגל חמישי…",
   "מקשיב לרשרוש של שקית חטיפים באולם 6…",
-  "מצליב מפות אולמות עם רמת מבוכה צפויה…",
-  "מחשב מדד בדידות ארצי…",
+  "מצליב תמונות לוויין של החניון…",
 ];
 let jokeDelay = null;
 let jokeTimer = null;
@@ -68,12 +67,28 @@ function stopScanJokes() {
   if (jokeTimer) { clearInterval(jokeTimer); jokeTimer = null; }
 }
 
-async function runScan() {
+// The site keeps a private tally of how often you scan, and starts to worry.
+function judgeRepeatScans() {
+  let n = 0;
+  try {
+    const key = "tw-scans-" + israelDate(0);
+    n = parseInt(localStorage.getItem(key) || "0", 10) + 1;
+    localStorage.setItem(key, String(n));
+  } catch (e) { /* private mode: no tally, no judgment */ }
+  if (n >= 8) return "לכמה סרטים אתם מתכננים ללכת?";
+  if (n >= 5) return "סריקה חמישית היום. אולי פשוט תזמינו חברים לסרט?";
+  if (n >= 3) return "סריקה שלישית היום. הכל בסדר אצלכם?";
+  return "";
+}
+let pendingJudgment = "";
+
+async function runScan(manual) {
   const date = dateInput.value;
   if (!date) { setHint("בחרו תאריך.", true); return; }
+  if (manual) pendingJudgment = judgeRepeatScans();
 
   scanBtn.disabled = true;
-  setHint('<span class="spinner"></span>סורק את כל האולמות אחרי זוג בודד…');
+  setHint('<span class="spinner"></span>סורק את כל האולמות אחר זוג בודד…');
   startScanJokes();
   if (staleTimer) { clearTimeout(staleTimer); staleTimer = null; }
 
@@ -83,8 +98,16 @@ async function runScan() {
     if (res.status === 429) { setHint("רגע, יותר מדי בקשות. נסו שוב בעוד כמה שניות.", true); return; }
     const data = await res.json();
 
+    if (data.error === "rate_limited") {
+      setHint("פלאנט שמו לב אלינו 🫣 חוזרים לסרוק בעוד כמה דקות.", true);
+      return;
+    }
+    if (data.error === "date_too_soon") {
+      setHint("להיום כבר אי אפשר — ספונטניות זה לזוגות. נסו מחר.", true);
+      return;
+    }
     if (data.error) {
-      setHint("לא הצלחנו למשוך נתונים מ־Planet כרגע. נסו שוב עוד רגע.", true);
+      setHint("לא הצלחנו למשוך נתונים מ־Planet כרגע. נסו שוב עוד מעט.", true);
       return;
     }
 
@@ -103,9 +126,10 @@ async function runScan() {
 
     if (data.stale) {
       setHint("מציג תוצאות אחרונות ומרענן ברקע… 🔄");
-      staleTimer = setTimeout(runScan, 4500);
+      staleTimer = setTimeout(() => runScan(false), 4500);
     } else {
-      setHint("");
+      setHint(pendingJudgment);
+      pendingJudgment = "";
     }
   } catch (e) {
     setHint("משהו השתבש בדרך לאולם. נסו שוב.", true);
@@ -163,11 +187,72 @@ function card(o, rank) {
     book.href = o.booking_link;
     book.target = "_blank";
     book.rel = "noopener";
+    guardBooking(book);
     actions.appendChild(book);
   }
   c.appendChild(actions);
   return c;
 }
+
+// ------------------------------------------------------- conscience check
+// Every road to Planet passes through a short chain of confirmations.
+// Regular dark patterns shame you into buying; these shame you into decency.
+const confirmEl = $("#confirm");
+const confirmText = $("#confirmText");
+const confirmYes = $("#confirmYes");
+const confirmNo = $("#confirmNo");
+const CONFIRM_STEPS = [
+  { text: "רגע — בטוחים שהזמנתם מספיק פופקורן לשלושתכם? 🍿", yes: "ברור", no: "אופס, לא" },
+  { text: "הם נראים מאושרים.", yes: "בדיוק בגלל זה אני בא, נהיה יותר מאושרים שלושתנו", no: "צודקים, נוותר להם" },
+  { text: "בסדר. שמרו על טווח לחישה נעים.", yes: "לאתר פלאנט 🎟️", no: "התחרטתי" },
+];
+let confirmStep = 0;
+let confirmHref = "";
+
+function guardBooking(a) {
+  a.addEventListener("click", (e) => {
+    e.preventDefault();
+    openConfirm(a.href);
+  });
+}
+
+function renderConfirmStep() {
+  const s = CONFIRM_STEPS[confirmStep];
+  confirmText.textContent = s.text;
+  confirmYes.textContent = s.yes;
+  confirmNo.textContent = s.no;
+}
+
+function openConfirm(href) {
+  confirmHref = href;
+  confirmStep = 0;
+  confirmYes.hidden = false;
+  confirmNo.hidden = false;
+  renderConfirmStep();
+  confirmEl.hidden = false;
+  confirmNo.focus(); // the decent choice is the default focus, naturally
+}
+
+function closeConfirm() {
+  confirmEl.hidden = true;
+}
+
+confirmYes.addEventListener("click", () => {
+  if (confirmStep < CONFIRM_STEPS.length - 1) {
+    confirmStep += 1;
+    renderConfirmStep();
+  } else {
+    window.open(confirmHref, "_blank", "noopener");
+    closeConfirm();
+  }
+});
+confirmNo.addEventListener("click", () => {
+  confirmText.textContent = "החלטה טובה. הם לעולם לא יידעו כמה קרוב זה היה.";
+  confirmYes.hidden = true;
+  confirmNo.hidden = true;
+  setTimeout(closeConfirm, 1800);
+});
+confirmEl.querySelector("[data-cclose]").addEventListener("click", closeConfirm);
 
 function escapeHtml(s) {
   return String(s == null ? "" : s)
@@ -195,7 +280,10 @@ function closeModal() {
   lastFocused = null;
 }
 modal.querySelectorAll("[data-close]").forEach((n) => n.addEventListener("click", closeModal));
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { closeConfirm(); closeModal(); }
+});
+guardBooking(bookLink); // the modal's Planet link passes the conscience check too
 modal.addEventListener("keydown", (e) => {
   if (e.key !== "Tab") return;
   const items = [...modal.querySelectorAll("button, a[href]")]
@@ -303,11 +391,14 @@ async function loadFact() {
 // -------------------------------------------------------------------- init
 // Always the *Israel* date (the cinemas' timezone), regardless of where the
 // visitor is or their device clock — en-CA formats as YYYY-MM-DD.
-function israelToday() {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
+function israelDate(offsetDays) {
+  return new Date(Date.now() + offsetDays * 86400000)
+    .toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
 }
-dateInput.value = israelToday();
-dateInput.min = israelToday();
-scanBtn.addEventListener("click", runScan);
+// Scanning opens at tomorrow. No banner explains this; it's one of those
+// things you don't notice at first glance.
+dateInput.value = israelDate(1);
+dateInput.min = israelDate(1);
+scanBtn.addEventListener("click", () => runScan(true));
 factBtn.addEventListener("click", loadFact);
 loadFact(); // show a fact right away, not a "click the button" prompt

@@ -11,8 +11,10 @@ import datetime as dt
 import hashlib
 import logging
 import threading
+import time
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
@@ -73,6 +75,19 @@ def _anonymize_ip(addr: str) -> str:
 
 
 @app.middleware("http")
+async def _cache_headers(request: Request, call_next):
+    """Long browser caching for the static tree. CSS/JS carry a content-hash
+    ?v= (immutable forever); images and icons don't, so they get a week."""
+    response = await call_next(request)
+    if request.url.path.startswith(("/static/", "/assets/")) and response.status_code == 200:
+        if "v=" in request.url.query:
+            response.headers["cache-control"] = "public, max-age=31536000, immutable"
+        else:
+            response.headers["cache-control"] = "public, max-age=604800"
+    return response
+
+
+@app.middleware("http")
 async def _log_request(request: Request, call_next):
     response = await call_next(request)
     now = dt.datetime.now(dt.timezone.utc)
@@ -90,8 +105,23 @@ async def _log_request(request: Request, call_next):
     return response
 
 
-def _today() -> str:
-    return dt.date.today().isoformat()
+# All dates run on the cinemas' clock, not the server's -- a UTC host would
+# otherwise disagree with Israel about "today" for a couple of hours a night.
+_IL_TZ = ZoneInfo("Asia/Jerusalem")
+
+
+def _israel_now() -> dt.datetime:
+    return dt.datetime.now(_IL_TZ)
+
+
+def _scan_date() -> str:
+    """The earliest scannable date: tomorrow, Israel time.
+
+    Same-day scanning is disabled on purpose (the inverse of a booking
+    dark pattern): you can only plan ahead, and while you wait, every seat
+    in "your" room stays on sale to the general public. Ambushes decay.
+    """
+    return (_israel_now().date() + dt.timedelta(days=1)).isoformat()
 
 
 def _valid_date(date: str) -> bool:
@@ -112,11 +142,13 @@ def _client_key(request: Request) -> str:
 @app.get("/api/scan")
 def api_scan(
     request: Request,
-    date: str = Query(default_factory=_today),
+    date: str = Query(default_factory=_scan_date),
     top: int = Query(default=12, ge=1, le=30),
 ):
     if not _valid_date(date):
         return JSONResponse({"error": "bad_date"}, status_code=400)
+    if date < _scan_date():  # today or earlier: spontaneity is for couples
+        return JSONResponse({"error": "date_too_soon"}, status_code=400)
     if not limiter.allow(_client_key(request), cost=2.0):
         return JSONResponse({"error": "rate_limited"}, status_code=429)
 
@@ -196,6 +228,17 @@ app.mount("/static", StaticFiles(directory=_STATIC), name="static")
 
 @app.on_event("startup")
 def _prewarm() -> None:
-    # Warm today's scan in the background so the first visitor isn't left
-    # waiting on a cold network pass.
-    threading.Thread(target=scanner.warm, args=(_today(),), daemon=True).start()
+    # Warm the earliest scannable date (tomorrow, Israel time) so the first
+    # visitor isn't left waiting on a cold network pass — then re-warm just
+    # after each Israel midnight, when "tomorrow" rolls over to a cold date.
+    def run() -> None:
+        scanner.warm(_scan_date())
+        while True:
+            now = _israel_now()
+            next_midnight = (now + dt.timedelta(days=1)).replace(
+                hour=0, minute=2, second=0, microsecond=0
+            )
+            time.sleep(max(60.0, (next_midnight - now).total_seconds()))
+            scanner.warm(_scan_date())
+
+    threading.Thread(target=run, daemon=True, name="tw-prewarm").start()

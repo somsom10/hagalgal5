@@ -17,11 +17,15 @@ def main() -> None:
     p.add_argument("--port", type=int, default=8000)
     p.add_argument("--reload", action="store_true", help="dev auto-reload")
     args = p.parse_args()
+    # Exactly one worker, on purpose: the scan cache, single-flight locks and
+    # simulation seeds all live in process memory. More workers would multiply
+    # the load on Planet and let the scan and seat map disagree.
     uvicorn.run(
         "third_wheel.web.app:app",
         host=args.host,
         port=args.port,
         reload=args.reload,
+        workers=1,
         log_level="info",
     )
 

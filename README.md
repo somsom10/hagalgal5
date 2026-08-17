@@ -52,6 +52,12 @@ python -m third_wheel.web            # → http://127.0.0.1:8000
 python -m third_wheel.web --host 0.0.0.0 --port 8080   # expose it
 ```
 
+**Deploy with exactly one worker process** (the launcher pins `workers=1`).
+The scan cache, single-flight locks and simulation seeds live in process
+memory; extra workers would multiply upstream load and desync the seat maps.
+All dates run on Israel's clock regardless of the server's timezone, and the
+scan cache re-warms itself just after each Israel midnight.
+
 **Being gentle on Planet's servers** is built in, since a public site could get
 real traffic:
 
@@ -65,6 +71,8 @@ real traffic:
   load is capped at one enrichment pass per date per window regardless of
   traffic. Seat plans are additionally cached to disk (`.cache/`).
 - A lenient per-IP token bucket stops a single client spinning the endpoints.
+- Static assets ship long `Cache-Control` headers (hash-busted CSS/JS are
+  immutable for a year, images a week), so repeat visits cost almost nothing.
 
 The site writes an **anonymized access log** (combined log format, IPv4 last
 octet / IPv6 tail zeroed before hitting disk) to `.logs/access.log`, so

@@ -368,6 +368,24 @@ body.modal-open { overflow: hidden; } /* no page scroll behind the dialog */
 .legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
 .legend i { width: 13px; height: 13px; border-radius: 3px; display: inline-block; }
 
+/* --------------------------------------------------- conscience dialog */
+.confirm { z-index: 60; } /* above the seat-map modal */
+.confirm__box {
+  max-width: 440px;
+  text-align: center;
+}
+.confirm__box p {
+  font-size: 1.15rem;
+  margin: 0.4rem 0 1.3rem;
+  line-height: 1.7;
+}
+.confirm__actions {
+  display: flex;
+  gap: 0.7rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
 .pick {
   text-align: center;
   font-size: 1.1rem;
