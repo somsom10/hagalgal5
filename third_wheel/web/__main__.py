@@ -27,6 +27,11 @@ def main() -> None:
         reload=args.reload,
         workers=1,
         log_level="info",
+        # uvicorn's own access log records the FULL client IP. app.py already
+        # writes a combined-format access log with the address anonymized
+        # before it touches disk, so this one would only leak what that one
+        # deliberately drops (into journald, where it lingers).
+        access_log=False,
     )
 
 
